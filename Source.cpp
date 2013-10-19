@@ -1,28 +1,218 @@
-#ifndef _PURE_KLEPTOMANIA
-#define _PURE_KLEPTOMANIA
+#ifndef _KEYBOARD_MACHINE
+#define _KEYBOARD_MACHINE
 
 #include <GL\freeglut.h>
 #include <GL\GL.h>
-#include <iostream>
 #include "WORLD.h"
+#include <iostream>
+
+#include <fstream>
+#include <string>
+#include <cstring>
+
+/****
+
+0 - W
+1 - S
+2 - A
+3 - D
+4 - Action/E
+5 - Inventory/Q
+6 - Run/Walk/Shift
+7 - MainMenu/ESC
+
+***/
+bool keys[8];
+
+/*
+This will be the clear keys function
+*/
+void resetKeys(void) 
+{
+	for(int i = 0; i < 8; i++) keys[i] = false;
+}
+
+void keyRelease(unsigned char keyStroke, int x, int y)
+{
+	switch(keyStroke)
+	{
+	case 'w': keys[0] = false;
+		break;
+
+	case 's': keys[1] = false;
+		break;
+
+	case 'a': keys[2] = false;
+		break;
+
+	case 'd': keys[3] = false;
+		break;
+
+	case 'e': 
+	case 'q': 
+	default: resetKeys();
+		break;
+	}	
+}
+
+/*
+
+Basic input for the keyboard
+
+*/
+void keyboardInput(unsigned char keyStroke, int x, int y)
+{
+	switch(keyStroke)
+	{
+	case 'w': keys[0] = true;
+		keys[1] = false;
+		break;
+
+	case 's': keys[0] = false;
+		keys[1] = true;
+		break;
+
+	case 'a': keys[2] = true;
+		keys[3] = false;
+		break;
+
+	case 'd': keys[2] = false;
+		keys[3] = true;
+		break;
+
+	case 'e': resetKeys();
+		keys[4] = true;
+		break;
+
+	case 'q': resetKeys();
+		keys[5] = true;
+		break;
+
+	default: break;
+	}
+}
+
+/*
+This is the state machine to run the keyboard in the idleFunc
+*/
+int speed = 8;
+player menuStates(player character, world map)
+{
+	//W and A
+	if(keys[0] && keys[2])
+	{
+		if(keys[6]);
+		else 
+		{
+			character.checkMovement(map, 0, speed);
+			character.checkMovement(map, -speed, 0);
+		}
+	}
+	//W and D
+	else if(keys[0] && keys[3])
+	{
+		if(keys[6]);
+		else
+		{
+			character.checkMovement(map, 0, speed);
+			character.checkMovement(map, speed, 0);
+		}
+	}
+	//S and A
+	else if(keys[1] && keys[2])
+	{
+		if(keys[6]);
+		else 
+		{
+			character.checkMovement(map, -speed, 0);
+			character.checkMovement(map, 0, -speed);
+		}
+
+	}
+	//S and D
+	else if(keys[1] && keys[3])
+	{
+		if(keys[6]);
+		else
+		{ 
+			character.checkMovement(map, 0, -speed);
+			character.checkMovement(map, speed,0);
+		}
+	}
+	//W
+	else if(keys[0])
+	{
+		if(keys[6]);
+		else character.checkMovement(map, 0, speed);
+	}
+	//S
+	else if(keys[1])
+	{
+		if(keys[6]);
+		else character.checkMovement(map, 0, -speed);
+	}
+	//A
+	else if(keys[2])
+	{
+		if(keys[6]);
+		else character.checkMovement(map, -speed, 0);
+	}
+	//D
+	else if(keys[3])
+	{
+		if(keys[6]);
+		else character.checkMovement(map, speed, 0);
+	}
+	//Action or E key
+	else if(keys[4]);
+	//Menu or Q key
+	else if(keys[7]);
+	return character;
+
+}
+
+#endif
+
+#ifndef _PURE_KLEPTOMANIA
+#define _PURE_KLEPTOMANIA
+
+
+//#include "keyboardFunctions.cpp"
 
 using namespace std;
 
-tile gergory;
-unsigned int initSize[2] = {1,1};
-world DAN(initSize);
-double* mallColors;
-double* mall;
 double WIDTH = 600;
 double HEIGHT = 600;
-double newX = 0;
-double newY = 0;
+
+int viewPortCenter[2] = {0,0};
+
+unsigned int initSize[2] = {1,1};
+world DAN(initSize);
 player nathan(DAN);
+
+void calculateViewPort(player character)
+{
+	viewPortCenter[0] = character.getPositionX() - WIDTH/2;
+	viewPortCenter[1] = character.getPositionY() - HEIGHT/2;
+}
+
+void updateViewPort(player character)
+{
+	if((character.getPositionX() - viewPortCenter[0]) > 0.75*WIDTH)
+		viewPortCenter[0] += 8; 
+	else if((character.getPositionX() - viewPortCenter[0]) < 0.25*WIDTH)
+		viewPortCenter[0]-=8; 
+	if((character.getPositionY() - viewPortCenter[1]) > 0.75*HEIGHT)
+		viewPortCenter[1]+=8; 
+	else if((character.getPositionY() - viewPortCenter[1]) < 0.25*HEIGHT)
+		viewPortCenter[1]-=8; 
+
+}
 
 void display(void)
 {
-	glClearColor(0,0,0,0);
-	glutInitDisplayMode(GL_DEPTH|GL_FLOAT|GL_RGBA);
+	glClearColor(0,0,0.1,0);
+	glutInitDisplayMode(GL_DEPTH | GL_FLOAT | GL_RGBA | GL_DOUBLEBUFFER);
 	glEnable(GL_DEPTH_TEST);
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glEnableClientState(GL_COLOR_ARRAY);
@@ -30,9 +220,10 @@ void display(void)
 	glLoadIdentity();
 	glMatrixMode(GL_MODELVIEW);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	gluOrtho2D(newX,WIDTH + newX, newY, HEIGHT + newY);
+	gluOrtho2D(viewPortCenter[0], WIDTH + viewPortCenter[0], viewPortCenter[1], HEIGHT + viewPortCenter[1]);
 	glViewport(0,0,WIDTH, HEIGHT);
 
+	updateViewPort(nathan);
 	//glColorPointer(3*DAN.getX()*DAN.getY(), GL_FLOAT, 0 , mallColors);
 	//glVertexPointer(2*DAN.getX()*DAN.getY(), GL_INT, 0, mall);
 
@@ -57,122 +248,103 @@ void display(void)
 	glEnd();
 
 	glutPostRedisplay();
+	glutSwapBuffers();
 	glFlush();
-}
-
-void populateWorld(world map)
-{
-	int x = map.getX();
-	int y = map.getY();
-	mallColors = new double[3*x*y];
-	mall = new double[3*x*y];
-	unsigned int pos[2];
-	for(int i = 0; i < x; i++)
-	{
-		pos[0] = i;
-		for(int j = 0; j < y; j++)
-		{
-			pos[1] = j;
-			if(map.checkTileMap(pos) == 0)
-			{
-				mallColors[3*(i + j*y)] = 0;
-				mallColors[3*(i + j*y) + 1] = 0;
-				mallColors[3*(i + j*y) + 2] = 1;
-			}
-			else
-			{
-				mallColors[3*(i + j*y)] = 1;
-				mallColors[3*(i + j*y) + 1] = 1;
-				mallColors[3*(i + j*y) + 2] = 1;
-			}
-			mall[3*(i + j*y)] = x/100;
-			mall[3*(i + j*y) + 1] = y/100;
-			mall[3*(i + j*y) + 2] = 0;
-		}
-	}
 }
 
 void reshape(int x, int y)
 {
 	WIDTH = x, HEIGHT = y;
+	calculateViewPort(nathan);
+}
+
+void idle(void)
+{
+	nathan = menuStates(nathan, DAN);
 }
 
 
-void updateViewPort(void)
+void populateWorld(unsigned int txtFileSize[])
 {
-	if ((nathan.getPositionY()-newY)>0.75*HEIGHT) {
-		newY+=8;
-	} 
-	if ((nathan.getPositionY()-newY)<0.25*HEIGHT){
-		newY-=8;
-	}
-	if ((nathan.getPositionX()-newX)>0.75*WIDTH){
-		newX+=8;
-	}
-	if ((nathan.getPositionX()-newX)<0.25*WIDTH){
-		newX-=8;
-	}
+	string fname = "world.txt";
+	string line;
+	ifstream infile;
 
-	cout<<"x player pos "<<nathan.getPositionX()<<endl;
-	cout<<"y player pos "<<nathan.getPositionY()<<endl;
-}
+	unsigned int lineNum = 0;
 
-void keyboard(unsigned char key, int x, int y)
-{
-	if(key == 'w'){
-		nathan.checkMovement(DAN, 0 , 8);
-		updateViewPort();
-	}
-	else if(key == 's'){
-		nathan.checkMovement(DAN, 0 , -8);
-		updateViewPort();
-	}
-	if(key == 'a')
+	unsigned int size[] = {0,txtFileSize[1]};
+
+	infile.open(fname);
+
+	while(!infile.eof())
 	{
-		nathan.checkMovement(DAN, -8 , 0);
-		updateViewPort();
-	}
-	else if(key == 'd'){
-		nathan.checkMovement(DAN, 8, 0);
-		updateViewPort();
-	}
-	if (key == 'y') newY+=64;
-	else if(key == 'h') newY-=64;
-	else if(key == 'g') newX-=64;
-	else if(key == 'j') newX+=64;
 
+		getline(infile,line);
+
+		cout<<line<<endl;
+
+		for (size_t i =0; i<line.size();i++)
+		{
+
+			char n = line[i];
+
+			//cout<<"char"<<n<<endl;
+
+			if (n=='0'){
+				DAN.setTileLocation(size, 0);
+				size[0]++;
+				//cout<<"i should be in here 0"<<endl;
+			}
+			else if(n=='1')
+			{
+				DAN.setTileLocation(size, 1);	
+				size[0]++;
+				//cout<<"i should be in here 1"<<endl;
+			}
+		}
+		size[0] = 0;
+		size[1]--;
+	}
+
+infile.close();
 }
 
 
 void main(int argv, char* argc[])
 {
-	tile block;
+	resetKeys();
 
+	tile block;
 	object newBlock;
 
 	unsigned int size[] = {5,5};
 
-	//DAN.changePlayerStart(
+	//size of text file rows,columns
+	unsigned int txtFileSize[] = {50,50};
+
 	DAN.changePlayerStart(size);
 	player greg(DAN);
 	nathan = greg;
 
-	//DAN.changeTilePassthrough(1, true);
-	//DAN.changeObjectPassthrough(0, true);
 
-	size[0] = 30;
-	size[1] = 30;
+	//this should be wrapped to the text file
+
 
 	block.changeDescription("HOORAY");
 	block.changePassThrough(true);
 
-	DAN.changeDimension(size);
-	cout << DAN.getTileCollision(0) << endl;
-	size[0] = 5;
-	size[1] = 5;
+	DAN.changeDimension(txtFileSize);
+	//cout << DAN.getTileCollision(0) << endl;
+	
+	//size[0] = 0;
+	//size[1] = 0;
 
 	DAN.addTile(block);
 	DAN.printLog();
+
+	populateWorld(txtFileSize);
+
+/*
 	for(int j = 0; j < 19; j++)
 	{
 		for(int i = 0; i < 19; i++)
@@ -183,7 +355,7 @@ void main(int argv, char* argc[])
 		size[1]++;
 		size[0]-=19;
 	}
-	size[1] = 18;
+	size[1] = 18; //18
 	size[0] = 6;
 	DAN.setTileLocation(size, 0);
 
@@ -202,8 +374,7 @@ void main(int argv, char* argc[])
 	size[1] = 7;
 	size[0] = 7;
 	DAN.setTileLocation(size, 0);
-	populateWorld(DAN);
-
+	
 	for(int i = DAN.getX() - 1; i > 0; i--)
 	{
 		size[1] = i;
@@ -214,13 +385,16 @@ void main(int argv, char* argc[])
 		}
 		cout << endl;
 	}
+	*/
 
 	glutInit(&argv, argc);
 	glutInitWindowSize(600,600);
 	glutCreateWindow("Pure Kleptomania");
 	glutDisplayFunc(display);
+	glutIdleFunc(idle);
 	glutReshapeFunc(reshape);
-	glutKeyboardFunc(keyboard);
+	glutKeyboardFunc(keyboardInput);
+	glutKeyboardUpFunc(keyRelease);
 	glutMainLoop();
 }
 
