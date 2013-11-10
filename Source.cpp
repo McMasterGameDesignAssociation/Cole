@@ -5,10 +5,10 @@
 #include <GL\GL.h>
 #include "WORLD.h"
 #include <iostream>
+#include <png.h>
 
 #include <fstream>
 #include <string>
-#include <cstring>
 
 /****
 
@@ -23,6 +23,9 @@
 
 ***/
 bool keys[8];
+
+//character speed
+int speed = 16;
 
 /*
 This will be the clear keys function
@@ -95,7 +98,6 @@ void keyboardInput(unsigned char keyStroke, int x, int y)
 /*
 This is the state machine to run the keyboard in the idleFunc
 */
-int speed = 8;
 player menuStates(player character, world map)
 {
 	//W and A
@@ -176,8 +178,7 @@ player menuStates(player character, world map)
 #ifndef _PURE_KLEPTOMANIA
 #define _PURE_KLEPTOMANIA
 
-
-//#include "keyboardFunctions.cpp"
+#define TEXTURE_LOAD_ERROR 0
 
 using namespace std;
 
@@ -185,10 +186,21 @@ double WIDTH = 600;
 double HEIGHT = 600;
 
 int viewPortCenter[2] = {0,0};
-
 unsigned int initSize[2] = {1,1};
 world DAN(initSize);
 player nathan(DAN);
+
+vector<string> stringWorld;
+
+//Texture Related Vars
+GLubyte *textureImage;
+GLuint *textures;
+int numberOfTextures = 3;
+
+
+//prototyping
+bool loadPngImage(char *name, int &outWidth, int &outHeight, bool &outHasAlpha, GLubyte **outData);
+void drawTiles(void);
 
 void calculateViewPort(player character)
 {
@@ -199,21 +211,22 @@ void calculateViewPort(player character)
 void updateViewPort(player character)
 {
 	if((character.getPositionX() - viewPortCenter[0]) > 0.75*WIDTH)
-		viewPortCenter[0] += 8; 
+		viewPortCenter[0] += speed; 
 	else if((character.getPositionX() - viewPortCenter[0]) < 0.25*WIDTH)
-		viewPortCenter[0]-=8; 
+		viewPortCenter[0]-=speed; 
 	if((character.getPositionY() - viewPortCenter[1]) > 0.75*HEIGHT)
-		viewPortCenter[1]+=8; 
+		viewPortCenter[1]+=speed; 
 	else if((character.getPositionY() - viewPortCenter[1]) < 0.25*HEIGHT)
-		viewPortCenter[1]-=8; 
+		viewPortCenter[1]-=speed; 
 
 }
 
 void display(void)
 {
-	glClearColor(0,0,0.1,0);
-	glutInitDisplayMode(GL_DEPTH | GL_FLOAT | GL_RGBA | GL_DOUBLEBUFFER);
-	glEnable(GL_DEPTH_TEST);
+	glClearColor(0.0,0.0,0.0,0.0);
+	glutInitDisplayMode(GL_DEPTH | GL_FLOAT | GL_RGB | GL_RGBA | GL_DOUBLEBUFFER);
+	
+	glEnable(GL_TEXTURE_2D);
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glEnableClientState(GL_COLOR_ARRAY);
 
@@ -224,32 +237,71 @@ void display(void)
 	glViewport(0,0,WIDTH, HEIGHT);
 
 	updateViewPort(nathan);
-	//glColorPointer(3*DAN.getX()*DAN.getY(), GL_FLOAT, 0 , mallColors);
-	//glVertexPointer(2*DAN.getX()*DAN.getY(), GL_INT, 0, mall);
 
-	//glDrawArrays(GL_POINTS,0, 2*DAN.getX()*DAN.getY());
-	glColor3f(1,1,1);
-	glPointSize(62);
-	glBegin(GL_POINTS);
-	unsigned int pos[2];
-	glColor3f(0,1,0);
-	glVertex2i(nathan.getPositionX(), nathan.getPositionY());
-	for(int i = 0; i < DAN.getY(); i++)
-	{
-		pos[1] = i;
-		for(int j = 0; j < DAN.getX(); j++)
-		{
-			pos[0] = j;
-			if(DAN.getTileCollision(DAN.checkTileMap(pos))) glColor3f(1,1,1);
-			else glColor3f(1,0,0);
-			glVertex2i(j*64,i*64);
-		}
-	}
+	//this draws the tiles
+	drawTiles();
+
+	//this is for the character
+	glClear(GL_DEPTH_BUFFER_BIT);
+	glBindTexture(GL_TEXTURE_2D,textures[0]);
+
+	glBegin(GL_QUADS);
+
+	glTexCoord2f(0.0f, 0.0f);
+	glVertex2f(nathan.getPositionX()-32,nathan.getPositionY()-32);
+
+	glTexCoord2f(1.0f, 0.0f);
+	glVertex2f(nathan.getPositionX()+32,nathan.getPositionY()-32);
+
+	glTexCoord2f(1.0f, 1.0f);
+	glVertex2f(nathan.getPositionX()+32,nathan.getPositionY()+32);
+
+	glTexCoord2f(0.0f, 1.0f);
+	glVertex2f(nathan.getPositionX()-32,nathan.getPositionY()+32);
+
 	glEnd();
 
 	glutPostRedisplay();
 	glutSwapBuffers();
 	glFlush();
+}
+
+void drawTiles(void)
+{
+	unsigned int pos[2];
+	int xPos = 0,yPos = 0;
+	for(int y = 0; y < DAN.getY(); y++)
+	{
+		
+		for(int x = 0; x < DAN.getX(); x++)
+		{
+			pos[0]=x;
+			pos[1]=y;
+
+			switch(DAN.checkTileMap(pos))
+			{
+			case 0://wall
+				glBindTexture(GL_TEXTURE_2D,textures[1]);
+				break;
+			case 1: //floor
+				glBindTexture(GL_TEXTURE_2D,textures[2]);
+				break;
+			}
+
+			glClearColor(0,0,0,0);
+			glClear(GL_DEPTH_BUFFER_BIT);
+			glBegin(GL_QUADS);
+			glTexCoord2f(0.0f, 0.0f); glVertex2i(xPos-32,yPos-32);
+			glTexCoord2f(1.0f, 0.0f); glVertex2i(xPos+32, yPos-32);
+			glTexCoord2f(1.0f, 1.0f); glVertex2i(xPos+32, yPos+32);
+			glTexCoord2f(0.0f, 1.0f); glVertex2i(xPos-32, yPos+32);
+			glEnd();
+
+			xPos +=64;
+		}
+		yPos += 64;
+		xPos = 0;
+	}
 }
 
 void reshape(int x, int y)
@@ -263,50 +315,224 @@ void idle(void)
 	nathan = menuStates(nathan, DAN);
 }
 
-
-void populateWorld(unsigned int txtFileSize[])
+void getWorldFromTextFile(string fname)
 {
-	string fname = "world.txt";
 	string line;
 	ifstream infile;
 
 	unsigned int lineNum = 0;
 
-	unsigned int size[] = {0,txtFileSize[1]};
-
 	infile.open(fname);
 
 	while(!infile.eof())
 	{
-
 		getline(infile,line);
+		stringWorld.push_back(line);
+	}
+	infile.close();
+}
 
-		cout<<line<<endl;
+void populateWorld(vector<string> map)
+{
+	unsigned int size[] = {0,map.size()};
 
-		for (size_t i =0; i<line.size();i++)
+	for (int i =0; i<map.size();i++)
+	{
+		for(int j = 0; j<(map.at(i)).length(); j++)
 		{
-
-			char n = line[i];
-
-			//cout<<"char"<<n<<endl;
-
-			if (n=='0'){
+			switch((map.at(i))[j])
+			{
+			case '0':
 				DAN.setTileLocation(size, 0);
 				size[0]++;
-				//cout<<"i should be in here 0"<<endl;
-			}
-			else if(n=='1')
-			{
+				break;
+			case '1':
 				DAN.setTileLocation(size, 1);	
 				size[0]++;
-				//cout<<"i should be in here 1"<<endl;
+				break;	
 			}
 		}
 		size[0] = 0;
 		size[1]--;
 	}
+}
 
-infile.close();
+unsigned int getTxtWorldX(void)
+{
+	return stringWorld.at(0).length();
+}
+
+unsigned int getTxtWorldY(void)
+{
+	return stringWorld.size();
+}
+
+void loadTexture(GLuint texture, char* filename)
+{
+	//i dont think these two things are needed
+	glClearColor(0.0, 0.0, 0.0, 0.0);
+	glEnable(GL_DEPTH_TEST);
+	
+	glEnable(GL_BLEND);
+    glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	
+	int width, height;
+    bool hasAlpha;
+    bool success = loadPngImage(filename, width, height, hasAlpha, &textureImage);
+    if (!success) {
+        std::cout << "Unable to load png file" << std::endl;
+        return;
+    }
+    std::cout << "Image loaded " << width << " " << height << " alpha " << hasAlpha << std::endl;
+    
+	glBindTexture(GL_TEXTURE_2D,texture);
+	
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, hasAlpha ? 4 : 3, width,
+                 height, 0, hasAlpha ? GL_RGBA : GL_RGB, GL_UNSIGNED_BYTE,
+                 textureImage);
+
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+}
+
+void init()
+{
+	textures = new GLuint[numberOfTextures];
+
+	glGenTextures(numberOfTextures,textures);
+
+	loadTexture(textures[0],"sprite_1.png");
+	loadTexture(textures[1],"wall_1.png");
+	loadTexture(textures[2],"floor_1.png");
+
+
+
+	glEnable(GL_DEPTH_TEST);
+}
+
+bool loadPngImage(char *name, int &outWidth, int &outHeight, bool &outHasAlpha, GLubyte **outData) {
+    png_structp png_ptr;
+    png_infop info_ptr;
+    unsigned int sig_read = 0;
+    int color_type, interlace_type;
+    FILE *fp;
+ 
+    if ((fp = fopen(name, "rb")) == NULL)
+        return false;
+ 
+    /* Create and initialize the png_struct
+     * with the desired error handler
+     * functions.  If you want to use the
+     * default stderr and longjump method,
+     * you can supply NULL for the last
+     * three parameters.  We also supply the
+     * the compiler header file version, so
+     * that we know if the application
+     * was compiled with a compatible version
+     * of the library.  REQUIRED
+     */
+    png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING,
+                                     NULL, NULL, NULL);
+ 
+    if (png_ptr == NULL) {
+        fclose(fp);
+        return false;
+    }
+ 
+    /* Allocate/initialize the memory
+     * for image information.  REQUIRED. */
+    info_ptr = png_create_info_struct(png_ptr);
+    if (info_ptr == NULL) {
+        fclose(fp);
+        png_destroy_read_struct(&png_ptr, NULL, NULL);
+        return false;
+    }
+ 
+    /* Set error handling if you are
+     * using the setjmp/longjmp method
+     * (this is the normal method of
+     * doing things with libpng).
+     * REQUIRED unless you  set up
+     * your own error handlers in
+     * the png_create_read_struct()
+     * earlier.
+     */
+    if (setjmp(png_jmpbuf(png_ptr))) {
+        /* Free all of the memory associated
+         * with the png_ptr and info_ptr */
+        png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
+        fclose(fp);
+        /* If we get here, we had a
+         * problem reading the file */
+        return false;
+    }
+ 
+    /* Set up the output control if
+     * you are using standard C streams */
+    png_init_io(png_ptr, fp);
+ 
+    /* If we have already
+     * read some of the signature */
+    png_set_sig_bytes(png_ptr, sig_read);
+ 
+    /*
+     * If you have enough memory to read
+     * in the entire image at once, and
+     * you need to specify only
+     * transforms that can be controlled
+     * with one of the PNG_TRANSFORM_*
+     * bits (this presently excludes
+     * dithering, filling, setting
+     * background, and doing gamma
+     * adjustment), then you can read the
+     * entire image (including pixels)
+     * into the info structure with this
+     * call
+     *
+     * PNG_TRANSFORM_STRIP_16 |
+     * PNG_TRANSFORM_PACKING  forces 8 bit
+     * PNG_TRANSFORM_EXPAND forces to
+     *  expand a palette into RGB
+     */
+    png_read_png(png_ptr, info_ptr, PNG_TRANSFORM_STRIP_16 | PNG_TRANSFORM_PACKING | PNG_TRANSFORM_EXPAND, NULL);
+ 
+    png_uint_32 width, height;
+    int bit_depth;
+    png_get_IHDR(png_ptr, info_ptr, &width, &height, &bit_depth, &color_type,
+                 &interlace_type, NULL, NULL);
+    outWidth = width;
+    outHeight = height;
+ 
+    unsigned int row_bytes = png_get_rowbytes(png_ptr, info_ptr);
+    *outData = (unsigned char*) malloc(row_bytes * outHeight);
+ 
+    png_bytepp row_pointers = png_get_rows(png_ptr, info_ptr);
+ 
+    for (int i = 0; i < outHeight; i++) {
+        // note that png is ordered top to
+        // bottom, but OpenGL expect it bottom to top
+        // so the order or swapped
+        memcpy(*outData+(row_bytes * (outHeight-1-i)), row_pointers[i], row_bytes);
+    }
+ 
+    /* Clean up after the read,
+     * and free any memory allocated */
+    png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
+ 
+    /* Close the file */
+    fclose(fp);
+ 
+    /* That's it */
+    return true;
+}
+
+void FreeImage(GLuint texture)
+{
+	glDeleteTextures(1,&texture);
 }
 
 
@@ -314,78 +540,28 @@ void main(int argv, char* argc[])
 {
 	resetKeys();
 
+	getWorldFromTextFile("world.txt");
+	unsigned int mapFileSize[] = {getTxtWorldX(),getTxtWorldY()};
+
 	tile block;
 	object newBlock;
 
-	unsigned int size[] = {5,5};
+	unsigned int startTile[] = {16,11};
 
-	//size of text file rows,columns
-	unsigned int txtFileSize[] = {50,50};
-
-	DAN.changePlayerStart(size);
+	DAN.changePlayerStart(startTile);
 	player greg(DAN);
 	nathan = greg;
-
-
-	//this should be wrapped to the text file
-
 
 	block.changeDescription("HOORAY");
 	block.changePassThrough(true);
 
-	DAN.changeDimension(txtFileSize);
-	//cout << DAN.getTileCollision(0) << endl;
+	DAN.changeDimension(mapFileSize); //sets map size
 	
-	//size[0] = 0;
-	//size[1] = 0;
 
 	DAN.addTile(block);
 	DAN.printLog();
 
-	populateWorld(txtFileSize);
-
-/*
-	for(int j = 0; j < 19; j++)
-	{
-		for(int i = 0; i < 19; i++)
-		{
-			DAN.setTileLocation(size, 1);
-			size[0]++;
-		}
-		size[1]++;
-		size[0]-=19;
-	}
-	size[1] = 18; //18
-	size[0] = 6;
-	DAN.setTileLocation(size, 0);
-
-	size[1] = 17;
-	size[0] = 6;
-	DAN.setTileLocation(size, 0);
-
-	size[1] = 17;
-	size[0] = 7;
-	DAN.setTileLocation(size, 0);
-
-	size[1] = 18;
-	size[0] = 7;
-	DAN.setTileLocation(size, 0);
-
-	size[1] = 7;
-	size[0] = 7;
-	DAN.setTileLocation(size, 0);
-	
-	for(int i = DAN.getX() - 1; i > 0; i--)
-	{
-		size[1] = i;
-		for(int j = 0; j < DAN.getY(); j++)
-		{
-			size[0] = j;
-			cout << (DAN.checkTileMap(size));
-		}
-		cout << endl;
-	}
-	*/
+	populateWorld(stringWorld);
 
 	glutInit(&argv, argc);
 	glutInitWindowSize(600,600);
@@ -395,7 +571,15 @@ void main(int argv, char* argc[])
 	glutReshapeFunc(reshape);
 	glutKeyboardFunc(keyboardInput);
 	glutKeyboardUpFunc(keyRelease);
+
+	init();
+	//drawTiles();
+
 	glutMainLoop();
+
+	FreeImage(textures[0]);
+	FreeImage(textures[1]);
+	FreeImage(textures[2]);
 }
 
 #endif
