@@ -1,206 +1,30 @@
-#ifndef _KEYBOARD_MACHINE
-#define _KEYBOARD_MACHINE
-
-#include <GL\freeglut.h>
-#include <GL\GL.h>
-#include "WORLD.h"
-#include <iostream>
-#include <png.h>
-
-#include <fstream>
-#include <string>
-
-/****
-
-0 - W
-1 - S
-2 - A
-3 - D
-4 - Action/E
-5 - Inventory/Q
-6 - Run/Walk/Shift
-7 - MainMenu/ESC
-
-***/
-bool keys[8];
-
-//character speed
-int speed = 16;
-
-/*
-This will be the clear keys function
-*/
-void resetKeys(void) 
-{
-	for(int i = 0; i < 8; i++) keys[i] = false;
-}
-
-void keyRelease(unsigned char keyStroke, int x, int y)
-{
-	switch(keyStroke)
-	{
-	case 'w': keys[0] = false;
-		break;
-
-	case 's': keys[1] = false;
-		break;
-
-	case 'a': keys[2] = false;
-		break;
-
-	case 'd': keys[3] = false;
-		break;
-
-	case 'e': 
-	case 'q': 
-	default: resetKeys();
-		break;
-	}	
-}
-
-/*
-
-Basic input for the keyboard
-
-*/
-void keyboardInput(unsigned char keyStroke, int x, int y)
-{
-	switch(keyStroke)
-	{
-	case 'w': keys[0] = true;
-		keys[1] = false;
-		break;
-
-	case 's': keys[0] = false;
-		keys[1] = true;
-		break;
-
-	case 'a': keys[2] = true;
-		keys[3] = false;
-		break;
-
-	case 'd': keys[2] = false;
-		keys[3] = true;
-		break;
-
-	case 'e': resetKeys();
-		keys[4] = true;
-		break;
-
-	case 'q': resetKeys();
-		keys[5] = true;
-		break;
-
-	default: break;
-	}
-}
-
-/*
-This is the state machine to run the keyboard in the idleFunc
-*/
-player menuStates(player character, world map)
-{
-	//W and A
-	if(keys[0] && keys[2])
-	{
-		if(keys[6]);
-		else 
-		{
-			character.checkMovement(map, 0, speed);
-			character.checkMovement(map, -speed, 0);
-		}
-	}
-	//W and D
-	else if(keys[0] && keys[3])
-	{
-		if(keys[6]);
-		else
-		{
-			character.checkMovement(map, 0, speed);
-			character.checkMovement(map, speed, 0);
-		}
-	}
-	//S and A
-	else if(keys[1] && keys[2])
-	{
-		if(keys[6]);
-		else 
-		{
-			character.checkMovement(map, -speed, 0);
-			character.checkMovement(map, 0, -speed);
-		}
-
-	}
-	//S and D
-	else if(keys[1] && keys[3])
-	{
-		if(keys[6]);
-		else
-		{ 
-			character.checkMovement(map, 0, -speed);
-			character.checkMovement(map, speed,0);
-		}
-	}
-	//W
-	else if(keys[0])
-	{
-		if(keys[6]);
-		else character.checkMovement(map, 0, speed);
-	}
-	//S
-	else if(keys[1])
-	{
-		if(keys[6]);
-		else character.checkMovement(map, 0, -speed);
-	}
-	//A
-	else if(keys[2])
-	{
-		if(keys[6]);
-		else character.checkMovement(map, -speed, 0);
-	}
-	//D
-	else if(keys[3])
-	{
-		if(keys[6]);
-		else character.checkMovement(map, speed, 0);
-	}
-	//Action or E key
-	else if(keys[4]);
-	//Menu or Q key
-	else if(keys[7]);
-	return character;
-
-}
-
-#endif
-
+#pragma once
 #ifndef _PURE_KLEPTOMANIA
 #define _PURE_KLEPTOMANIA
 
-#define TEXTURE_LOAD_ERROR 0
+#include "COLLECTIONS.h"
+#include "KEYBOARD.h"
+#include "RENDERER.h"
+#include <string>;
 
+using namespace kyb;
 using namespace std;
 
 double WIDTH = 600;
 double HEIGHT = 600;
 
 int viewPortCenter[2] = {0,0};
+
 unsigned int initSize[2] = {1,1};
 world DAN(initSize);
 player nathan(DAN);
 
-vector<string> stringWorld;
+renderer scene;
 
-//Texture Related Vars
-GLubyte *textureImage;
-GLuint *textures;
-int numberOfTextures = 3;
+counter timer;
+int cycles = 0;
 
-
-//prototyping
-bool loadPngImage(char *name, int &outWidth, int &outHeight, bool &outHasAlpha, GLubyte **outData);
-void drawTiles(void);
+vector<string> tileMapVec;
 
 void calculateViewPort(player character)
 {
@@ -211,97 +35,58 @@ void calculateViewPort(player character)
 void updateViewPort(player character)
 {
 	if((character.getPositionX() - viewPortCenter[0]) > 0.75*WIDTH)
-		viewPortCenter[0] += speed; 
+		viewPortCenter[0] += character.getSpeed(); 
 	else if((character.getPositionX() - viewPortCenter[0]) < 0.25*WIDTH)
-		viewPortCenter[0]-=speed; 
+		viewPortCenter[0]-= character.getSpeed(); 
 	if((character.getPositionY() - viewPortCenter[1]) > 0.75*HEIGHT)
-		viewPortCenter[1]+=speed; 
+		viewPortCenter[1]+= character.getSpeed(); 
 	else if((character.getPositionY() - viewPortCenter[1]) < 0.25*HEIGHT)
-		viewPortCenter[1]-=speed; 
-
+		viewPortCenter[1]-= character.getSpeed(); 
 }
 
 void display(void)
 {
-	glClearColor(0.0,0.0,0.0,0.0);
-	glutInitDisplayMode(GL_DEPTH | GL_FLOAT | GL_RGB | GL_RGBA | GL_DOUBLEBUFFER);
-	
+	glClearColor(0,0,0.1,0);
+	glutInitDisplayMode(GL_DEPTH | GL_DOUBLE | GL_RGBA);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_TEXTURE_2D);
-	glEnableClientState(GL_VERTEX_ARRAY);
-	glEnableClientState(GL_COLOR_ARRAY);
 
 	glLoadIdentity();
-	glMatrixMode(GL_MODELVIEW);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	
 	gluOrtho2D(viewPortCenter[0], WIDTH + viewPortCenter[0], viewPortCenter[1], HEIGHT + viewPortCenter[1]);
 	glViewport(0,0,WIDTH, HEIGHT);
 
 	updateViewPort(nathan);
 
-	//this draws the tiles
-	drawTiles();
+	glPointSize(62);
 
-	//this is for the character
-	glClear(GL_DEPTH_BUFFER_BIT);
-	glBindTexture(GL_TEXTURE_2D,textures[0]);
+	//glBegin(GL_POINTS);
+	//glColor3f(0,1,0);
+	//glVertex2i(nathan.getPositionX(), nathan.getPositionY());
+	//glEnd();
+	scene.render();
 
-	glBegin(GL_QUADS);
+	glBindTexture(GL_TEXTURE_2D, scene.textureData.getTexture());
 
-	glTexCoord2f(0.0f, 0.0f);
-	glVertex2f(nathan.getPositionX()-32,nathan.getPositionY()-32);
+	float textureCoords[] = {0,0, 1,0, 0,1, 0,1, 1,1, 1,0};
+	float playerPos[] = {nathan.getPositionX()-32,nathan.getPositionY()-32,
+		nathan.getPositionX()+32,nathan.getPositionY()-32,
+		nathan.getPositionX()-32,nathan.getPositionY()+32,
+		nathan.getPositionX()-32,nathan.getPositionY()+32,
+		nathan.getPositionX()+32,nathan.getPositionY()+32,
+		nathan.getPositionX()+32,nathan.getPositionY()-32};
+	float playerCol[] = {1,1,0, 1,1,0, 0,1,1, 0,1,1, 1,0,1, 1,0,1};
 
-	glTexCoord2f(1.0f, 0.0f);
-	glVertex2f(nathan.getPositionX()+32,nathan.getPositionY()-32);
-
-	glTexCoord2f(1.0f, 1.0f);
-	glVertex2f(nathan.getPositionX()+32,nathan.getPositionY()+32);
-
-	glTexCoord2f(0.0f, 1.0f);
-	glVertex2f(nathan.getPositionX()-32,nathan.getPositionY()+32);
-
-	glEnd();
+	//cout << scene.textureData.texture[0] << endl;
+	glVertexPointer(2, GL_FLOAT, 0, playerPos);
+	glColorPointer(3, GL_FLOAT, 0, playerCol);
+	glTexCoordPointer(2, GL_FLOAT, 0, textureCoords);
+	glDrawArrays(GL_TRIANGLES, 0, 6);
 
 	glutPostRedisplay();
 	glutSwapBuffers();
 	glFlush();
-}
-
-void drawTiles(void)
-{
-	unsigned int pos[2];
-	int xPos = 0,yPos = 0;
-	for(int y = 0; y < DAN.getY(); y++)
-	{
-		
-		for(int x = 0; x < DAN.getX(); x++)
-		{
-			pos[0]=x;
-			pos[1]=y;
-
-			switch(DAN.checkTileMap(pos))
-			{
-			case 0://wall
-				glBindTexture(GL_TEXTURE_2D,textures[1]);
-				break;
-			case 1: //floor
-				glBindTexture(GL_TEXTURE_2D,textures[2]);
-				break;
-			}
-
-			glClearColor(0,0,0,0);
-			glClear(GL_DEPTH_BUFFER_BIT);
-			glBegin(GL_QUADS);
-			glTexCoord2f(0.0f, 0.0f); glVertex2i(xPos-32,yPos-32);
-			glTexCoord2f(1.0f, 0.0f); glVertex2i(xPos+32, yPos-32);
-			glTexCoord2f(1.0f, 1.0f); glVertex2i(xPos+32, yPos+32);
-			glTexCoord2f(0.0f, 1.0f); glVertex2i(xPos-32, yPos+32);
-			glEnd();
-
-			xPos +=64;
-		}
-		yPos += 64;
-		xPos = 0;
-	}
 }
 
 void reshape(int x, int y)
@@ -312,11 +97,21 @@ void reshape(int x, int y)
 
 void idle(void)
 {
+	nathan.setSpeed(4);
 	nathan = menuStates(nathan, DAN);
+	//if(1 < cycles)
+	//{
+	//	nathan = menuStates(nathan, DAN);
+	//	cycles = 0;
+	//}
+	//else cycles++;
+	//timer.updateSystem();
 }
 
-void getWorldFromTextFile(string fname)
+///////////MOVE TO CLASS/////////////
+vector<string> getWorldFromTextFile(string fname)
 {
+	vector<string> stringWorld;
 	string line;
 	ifstream infile;
 
@@ -327,13 +122,183 @@ void getWorldFromTextFile(string fname)
 	while(!infile.eof())
 	{
 		getline(infile,line);
+		if (line=="") continue; //gets ride of blank line
 		stringWorld.push_back(line);
 	}
 	infile.close();
+
+	return stringWorld;
+}
+
+//testing purposes
+void printStringVector(vector<string> vec)
+{
+	for (int i = 0; i<vec.size();i++)
+	{
+		cout<<vec.at(i)<<endl;
+	}
+}
+
+bool getPassThroughtByStr(string s)
+{
+	if (s == "false") return false;
+	else if(s == "true") return true;
+	else return false;
+}
+
+bool doubleStar(string line)
+{
+	return line[0]=='*' && line[1]=='*';
+}
+
+bool tripleStar(string line)
+{
+	return line[0]=='*' && line[1]=='*' && line[2]=='*';
+}
+
+void parseAbstractionLevels(vector<string> txtVec, world map)
+{
+	string title;
+	int temp;
+	bool search = false;
+	tile tl;
+	actor act;
+	object ob;
+	string line;
+	player ply(map);
+
+	for (int i = 0; i <txtVec.size();i++)
+	{
+		line = txtVec.at(i);
+		
+		if(doubleStar(line) && !tripleStar(line))
+		{
+			title = line.substr(2,line.size());
+			cout<<"Title:"<<title<<endl;
+		}
+		else if (tripleStar(line))
+		{
+			search = !search;
+			if (!search) 
+			{
+				map.addTile(tl);
+				map.addObject(ob);
+				map.addActor(act);
+			}
+			continue;
+		}
+		else
+		{
+			int index = line.find(":") +1;
+			string type = line.substr(1,index-2);
+			cout<<"type:"<<type<<endl;	
+			string subStr = line.substr(index+1,line.size()-1);
+			cout<<"subString:"<<subStr<<endl;
+			unsigned int mapSize[2];
+
+			if(type =="DESCRIPTION")
+			{
+				if (title =="TILE" )
+				{
+					cout<<"------>i am in tile discription"<<endl;
+					tl.changeDescription(subStr);
+				}
+				else if (title == "OBJECT")
+				{
+					ob.changeDescription(subStr);
+				}
+				else if (title =="ACTOR")
+				{
+					act.changeDescription(subStr);
+				}
+				else if (title =="PLAYER")
+				{
+					ply.changeDescription(subStr);
+				}
+			}
+			else if(type =="PASSABLE")
+			{
+				if (title =="TILE" )
+				{	
+					tl.changePassThrough(getPassThroughtByStr(subStr));
+				}
+				else if (title == "OBJECT")
+				{
+					ob.changePassThrough(getPassThroughtByStr(line));
+				}
+			}
+			else if(type == "FACE")
+			{
+				
+				if (title == "OBJECT")
+				{
+					if (subStr == "up") ob.changeFace(object::direction::up);
+					else if (subStr == "down") ob.changeFace(object::direction::down);
+					else if (subStr == "left") ob.changeFace(object::direction::left);
+					else if (subStr == "right") ob.changeFace(object::direction::right);
+					else ob.changeFace(object::direction::up);
+				}
+				else if (title =="ACTOR")
+				{
+					if (subStr == "up") act.changeDirection(actor::direction::up);
+					else if (subStr == "down") act.changeDirection(actor::direction::down);
+					else if (subStr == "left") act.changeDirection(actor::direction::left);
+					else if (subStr == "right") act.changeDirection(actor::direction::right);
+					else act.changeDirection(actor::direction::up);
+				}
+				else if (title =="PLAYER")
+				{
+					if (subStr == "up") ply.changeDirection(player::direction::up);
+					else if (subStr == "down") ply.changeDirection(player::direction::down);
+					else if (subStr == "left") ply.changeDirection(player::direction::left);
+					else if (subStr == "right") ply.changeDirection(player::direction::right);
+					else ply.changeDirection(player::direction::up);
+				}
+			}
+			else if(type =="START_X")
+			{
+				if (title =="ACTOR") act.setPosX(stoi(subStr));
+				else if (title=="PLAYER") ply.setPosX(stoi(subStr)); 
+			}
+			else if(type =="START_Y")
+			{
+				if (title =="ACTOR") act.setPosY(stoi(subStr));
+				else if (title=="PLAYER") ply.setPosY(stoi(subStr)); 
+			}
+			else if(type == "BITMAP")
+			{
+				if (title =="ACTOR") act.changeBitMapName(subStr);
+				else if (title=="PLAYER") ply.changeBitMap(subStr); 
+			}
+			else if(type =="SPEED")
+			{
+				if (title =="ACTOR") act.setSpeed(stoi(subStr));
+				else if (title=="PLAYER") ply.setSpeed(stoi(subStr));
+			}
+			else if(type=="WIDTH")
+			{
+				if (title =="TILE_MAP") mapSize[0] = (unsigned int) stoi(subStr);
+				cout<<"----------->w= "<<mapSize[0]/2<<endl;
+			}
+			else if(type=="HEIGHT")
+			{
+				if (title =="TILE_MAP")
+				{
+					mapSize[1]= (unsigned int) stoi(subStr);
+					map.changeDimension(mapSize);
+				}
+			}else 
+			{
+				tileMapVec.push_back(line);	
+			}
+		}
+	}	
 }
 
 void populateWorld(vector<string> map)
 {
+
+	//change all this
 	unsigned int size[] = {0,map.size()};
 
 	for (int i =0; i<map.size();i++)
@@ -352,234 +317,104 @@ void populateWorld(vector<string> map)
 				break;	
 			}
 		}
-		size[0] = 0;
+		size[0]= 0;
 		size[1]--;
 	}
 }
 
-unsigned int getTxtWorldX(void)
+
+//this is depreciated
+void populateWorld(unsigned int txtFileSize[])
 {
-	return stringWorld.at(0).length();
+        string fname = "world.txt";
+        string line;
+        ifstream infile;
+
+        unsigned int lineNum = 0;
+
+        unsigned int size[] = {0,txtFileSize[1]};
+
+        infile.open(fname);
+
+        while(!infile.eof())
+        {
+                getline(infile,line);
+
+                cout<<line<<endl;
+
+                for (size_t i = 0; i < line.size(); i++)
+                {
+                        char n = line[i];
+
+                        //cout<<"char"<<n<<endl;
+
+                        if (n=='0'){
+                                DAN.setTileLocation(size, 0); //ID = 0 -->wall
+                                size[0]++;
+                                //cout<<"i should be in here 0"<<endl;
+                        }
+                        else if(n=='1')
+                        {
+                                DAN.setTileLocation(size, 1);  //ID = 1 --> floor      
+                                size[0]++;
+                                //cout<<"i should be in here 1"<<endl;
+                        }
+                }
+                size[0] = 0;
+                size[1]--;
+        }
+
+infile.close();
 }
 
-unsigned int getTxtWorldY(void)
-{
-	return stringWorld.size();
-}
-
-void loadTexture(GLuint texture, char* filename)
-{
-	//i dont think these two things are needed
-	glClearColor(0.0, 0.0, 0.0, 0.0);
-	glEnable(GL_DEPTH_TEST);
-	
-	glEnable(GL_BLEND);
-    glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	
-	int width, height;
-    bool hasAlpha;
-    bool success = loadPngImage(filename, width, height, hasAlpha, &textureImage);
-    if (!success) {
-        std::cout << "Unable to load png file" << std::endl;
-        return;
-    }
-    std::cout << "Image loaded " << width << " " << height << " alpha " << hasAlpha << std::endl;
-    
-	glBindTexture(GL_TEXTURE_2D,texture);
-	
-	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-
-    glTexImage2D(GL_TEXTURE_2D, 0, hasAlpha ? 4 : 3, width,
-                 height, 0, hasAlpha ? GL_RGBA : GL_RGB, GL_UNSIGNED_BYTE,
-                 textureImage);
-
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-}
-
-void init()
-{
-	textures = new GLuint[numberOfTextures];
-
-	glGenTextures(numberOfTextures,textures);
-
-	loadTexture(textures[0],"sprite_1.png");
-	loadTexture(textures[1],"wall_1.png");
-	loadTexture(textures[2],"floor_1.png");
-
-
-
-	glEnable(GL_DEPTH_TEST);
-}
-
-bool loadPngImage(char *name, int &outWidth, int &outHeight, bool &outHasAlpha, GLubyte **outData) {
-    png_structp png_ptr;
-    png_infop info_ptr;
-    unsigned int sig_read = 0;
-    int color_type, interlace_type;
-    FILE *fp;
- 
-    if ((fp = fopen(name, "rb")) == NULL)
-        return false;
- 
-    /* Create and initialize the png_struct
-     * with the desired error handler
-     * functions.  If you want to use the
-     * default stderr and longjump method,
-     * you can supply NULL for the last
-     * three parameters.  We also supply the
-     * the compiler header file version, so
-     * that we know if the application
-     * was compiled with a compatible version
-     * of the library.  REQUIRED
-     */
-    png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING,
-                                     NULL, NULL, NULL);
- 
-    if (png_ptr == NULL) {
-        fclose(fp);
-        return false;
-    }
- 
-    /* Allocate/initialize the memory
-     * for image information.  REQUIRED. */
-    info_ptr = png_create_info_struct(png_ptr);
-    if (info_ptr == NULL) {
-        fclose(fp);
-        png_destroy_read_struct(&png_ptr, NULL, NULL);
-        return false;
-    }
- 
-    /* Set error handling if you are
-     * using the setjmp/longjmp method
-     * (this is the normal method of
-     * doing things with libpng).
-     * REQUIRED unless you  set up
-     * your own error handlers in
-     * the png_create_read_struct()
-     * earlier.
-     */
-    if (setjmp(png_jmpbuf(png_ptr))) {
-        /* Free all of the memory associated
-         * with the png_ptr and info_ptr */
-        png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
-        fclose(fp);
-        /* If we get here, we had a
-         * problem reading the file */
-        return false;
-    }
- 
-    /* Set up the output control if
-     * you are using standard C streams */
-    png_init_io(png_ptr, fp);
- 
-    /* If we have already
-     * read some of the signature */
-    png_set_sig_bytes(png_ptr, sig_read);
- 
-    /*
-     * If you have enough memory to read
-     * in the entire image at once, and
-     * you need to specify only
-     * transforms that can be controlled
-     * with one of the PNG_TRANSFORM_*
-     * bits (this presently excludes
-     * dithering, filling, setting
-     * background, and doing gamma
-     * adjustment), then you can read the
-     * entire image (including pixels)
-     * into the info structure with this
-     * call
-     *
-     * PNG_TRANSFORM_STRIP_16 |
-     * PNG_TRANSFORM_PACKING  forces 8 bit
-     * PNG_TRANSFORM_EXPAND forces to
-     *  expand a palette into RGB
-     */
-    png_read_png(png_ptr, info_ptr, PNG_TRANSFORM_STRIP_16 | PNG_TRANSFORM_PACKING | PNG_TRANSFORM_EXPAND, NULL);
- 
-    png_uint_32 width, height;
-    int bit_depth;
-    png_get_IHDR(png_ptr, info_ptr, &width, &height, &bit_depth, &color_type,
-                 &interlace_type, NULL, NULL);
-    outWidth = width;
-    outHeight = height;
- 
-    unsigned int row_bytes = png_get_rowbytes(png_ptr, info_ptr);
-    *outData = (unsigned char*) malloc(row_bytes * outHeight);
- 
-    png_bytepp row_pointers = png_get_rows(png_ptr, info_ptr);
- 
-    for (int i = 0; i < outHeight; i++) {
-        // note that png is ordered top to
-        // bottom, but OpenGL expect it bottom to top
-        // so the order or swapped
-        memcpy(*outData+(row_bytes * (outHeight-1-i)), row_pointers[i], row_bytes);
-    }
- 
-    /* Clean up after the read,
-     * and free any memory allocated */
-    png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
- 
-    /* Close the file */
-    fclose(fp);
- 
-    /* That's it */
-    return true;
-}
-
-void FreeImage(GLuint texture)
-{
-	glDeleteTextures(1,&texture);
-}
-
+/////////END MOVE TO CLASS///////
 
 void main(int argv, char* argc[])
 {
-	resetKeys();
+		resetKeys();
 
-	getWorldFromTextFile("world.txt");
-	unsigned int mapFileSize[] = {getTxtWorldX(),getTxtWorldY()};
+        tile block;
+        object newBlock;
 
-	tile block;
-	object newBlock;
+		vector<string> vec = getWorldFromTextFile("world_NEW.txt");
+		//printStringVector(vec);
+		parseAbstractionLevels(vec, DAN);
 
-	unsigned int startTile[] = {16,11};
 
-	DAN.changePlayerStart(startTile);
-	player greg(DAN);
-	nathan = greg;
 
-	block.changeDescription("HOORAY");
-	block.changePassThrough(true);
+        //unsigned int size[] = {5,5};
 
-	DAN.changeDimension(mapFileSize); //sets map size
-	
+        //size of text file rows,columns
+        //unsigned int txtFileSize[] = {50,50};
 
-	DAN.addTile(block);
-	DAN.printLog();
+        //DAN.changePlayerStart(size);
+        player greg(DAN);
+        nathan = greg;
 
-	populateWorld(stringWorld);
+       // block.changeDescription("HOORAY");
+        //block.changePassThrough(true);
 
-	glutInit(&argv, argc);
-	glutInitWindowSize(600,600);
-	glutCreateWindow("Pure Kleptomania");
-	glutDisplayFunc(display);
-	glutIdleFunc(idle);
-	glutReshapeFunc(reshape);
-	glutKeyboardFunc(keyboardInput);
-	glutKeyboardUpFunc(keyRelease);
+        //DAN.changeDimension(txtFileSize);
 
-	init();
-	//drawTiles();
+		//DAN.addTile(block);
+        //DAN.printLog();
 
-	glutMainLoop();
+		populateWorld(tileMapVec);
 
-	FreeImage(textures[0]);
-	FreeImage(textures[1]);
-	FreeImage(textures[2]);
+		cout<<"tile map: "<<endl;
+		printStringVector(tileMapVec);
+
+		scene.worldToArray(DAN, 64);
+
+        glutInit(&argv, argc);
+        glutInitWindowSize(600,600);
+        glutCreateWindow("Pure Kleptomania");
+        glutDisplayFunc(display);
+        glutIdleFunc(idle);
+        glutReshapeFunc(reshape);
+        glutKeyboardFunc(keyboardInput);
+        glutKeyboardUpFunc(keyRelease);
+        glutMainLoop();
 }
 
 #endif
