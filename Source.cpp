@@ -1,39 +1,98 @@
+/*
+CURRENT VERSION ALPHA 0.01
+VERSION NOTES
+-Basic game operation (i.e. movement, basic collision detection)
+-Basic file operation (i.e. fully readable files, no organization structure)
+-Texturing
+-Walk animations
+
+-No level editor
+-No win condition
+-No lose condition
+-No story elements
+
+UPDATES REQUIRED
+
+-Separation of the test globals from the
+keyboard function (This is an NPC issue)
+
+-Separation of the NPC animation and
+update procedures
+
+-Locking the mouse to the movement
+	-An updated method will be need
+
+-Lose condition needs to be added
+
+-DTD, XML reader and conf reader needs to be implemented
+
+*/
+
 #pragma once
 #ifndef _PURE_KLEPTOMANIA
 #define _PURE_KLEPTOMANIA
 
 #include "COLLECTIONS.h"
-#include "KEYBOARD.h"
-#include "RENDERER.h"
-#include <string>;
+//#include "RENDERER.h"
 
-using namespace kyb;
 using namespace std;
 
-double WIDTH = 600;
-double HEIGHT = 600;
+//Current values for maintaining the
+//The size of the screen
+int WIDTH = 600;
+int HEIGHT = 600;
 
+//This is the initial centering of the view port
+//Set to 0,0 since the starting position needs to be
+//decided by the current map
 int viewPortCenter[2] = {0,0};
 
+//These are just test constants and are pretty self
+//explanatory
 unsigned int initSize[2] = {1,1};
 world DAN(initSize);
-player nathan(DAN);
+player PLAYER_ONE(DAN);
+bool pause = false;
+bool suspicious = false;
+vector<actor> actorVector;
+
+/*
+Added by Ryan and needs to be built
+into its own class
+*/
+
+//NPC variables
+int detectionRange = 64 * 100;
+int frameCounter = 0;
+int randomNumNPC;
+int frameStop = 1000; //NPCs will update their direction in less frames if they hit a wall
+//NPC variables
 
 renderer scene;
 
-counter timer;
-int cycles = 0;
+//FileReading + suspcisionMeter visual - Cole
+FileReader fr("world.txt");
+vector<vector<int>> worldMap;
+SuspicionMeter susMeter;
 
-vector<string> tileMapVec;
 
-void calculateViewPort(player character)
-{
-	viewPortCenter[0] = character.getPositionX() - WIDTH/2;
-	viewPortCenter[1] = character.getPositionY() - HEIGHT/2;
-}
 
+#include "KEYBOARD.h"
+using namespace kyb;
+
+/*
+contains:
+player character
+	character designates the player that the view port is following
+
+Update viewport creates an invisible box around the player which gives
+the area that the camera can see
+*/
 void updateViewPort(player character)
 {
+	//The viewport encompasses 75% of the the center of the scene
+	//Therefore when the chracter position reaches 25%> and <75%
+	//The view port moves at the same speed as the character
 	if((character.getPositionX() - viewPortCenter[0]) > 0.75*WIDTH)
 		viewPortCenter[0] += character.getSpeed(); 
 	else if((character.getPositionX() - viewPortCenter[0]) < 0.25*WIDTH)
@@ -44,45 +103,133 @@ void updateViewPort(player character)
 		viewPortCenter[1]-= character.getSpeed(); 
 }
 
+/*
+Passive Mouse function that modifies the current hardcoded player information
+and then passes it to the scene to render it
+*/
+void passiveMouse(int x, int y)
+{
+	int pos[] = {x, y};
+	int dimensions[] = {WIDTH, HEIGHT};
+	PLAYER_ONE.changeDirection(pos, dimensions);
+	scene.animatePlayer(PLAYER_ONE, false);
+}
+
+/*
+This is the obligatory display function, THE COMMENTS INSIDE
+THE FUNCTION ARE IMPORTANT
+
+Required updates:
+
+- Removal of NPC logic and rendering
+*/
 void display(void)
 {
-	glClearColor(0,0,0.1,0);
+	//Obligatory Set up functions
+	glClearColor(0,0,0.2,0);
 	glutInitDisplayMode(GL_DEPTH | GL_DOUBLE | GL_RGBA);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	//The Depth buffer is necessary for the transparencies to work
+	glEnable(GL_DEPTH);
 	glEnable(GL_DEPTH_TEST);
+
+	//Never Forget the teture initialization
 	glEnable(GL_TEXTURE_2D);
 
+	//LoadIdentiry is used to clear all current transformations (only useful on start up
+	//since all movement is done by modifiying the draw and not by using transisitions)
 	glLoadIdentity();
 	
 	gluOrtho2D(viewPortCenter[0], WIDTH + viewPortCenter[0], viewPortCenter[1], HEIGHT + viewPortCenter[1]);
 	glViewport(0,0,WIDTH, HEIGHT);
 
-	updateViewPort(nathan);
+	//Update the view port to maintain the camera on the player
+	updateViewPort(PLAYER_ONE);
 
-	glPointSize(62);
+	/* (+) Drawing the NPCs
+        * this will draw the NPC's and make them chase the player
+        */
+       
+       //Added by Ryan
+       
+ 
+        /*
+        This for loop makes the NPCs move
+        */
+		glPointSize(64);
+		glBegin(GL_POINTS);
+        for(unsigned int i = 0; i < actorVector.size(); i++)
+		{
+			double probabilities[4] = {1,1,1,1};
+            glColor3f(actorVector[i].getAlert(),0.3,0.7);
+               
+            glVertex2i(actorVector[i].getPosition().x, actorVector[i].getPosition().y);
+            actorVector[i].updateMovement(DAN);
+ 
+  			if(actorVector[i].isFacingPlayer(PLAYER_ONE) && suspicious) actorVector[i].increaseAlert();
+			else if(actorVector[i].getAlert() > 0) actorVector[i].decreaseAlert();
+ 
+			actorVector[i].setMoving(true);
+            if(actorVector[i].getAlert() == 0) {
+		
+			//Scatter algorithm
+			int * seedy;
+			seedy = new int[0];
+			srand(time(NULL) * (int)&seedy[0]);
+			delete[] seedy;
+            randomNumNPC = rand()%100;
+            //In this situation, the NPCs are out of range. They patrol the area
+			//This should be migrated to the timer function
+			if(actorVector[i].getIsHittingWall() == false) frameStop = 1000;
+			else frameStop = 200;
+ 
+			frameCounter++;
+                       
+			if(frameCounter > frameStop)
+			{
+				actorVector[i].changeDirection(probabilities);
+				frameCounter = 0;
+			}
+		}
+               
+		//Detect movement ends here
+        actorVector[i].setMoving(true);
+		if(actorVector[i].isFacingPlayer(PLAYER_ONE) && actorVector[i].getAlert() > 0)
+        { //if actor can see vector
+			actorVector[i].setMoving(true);
+			if(abs( (double) PLAYER_ONE.getPositionX() - actorVector[i].getPosition().x) > 32 || abs( (double) PLAYER_ONE.getPositionY() - actorVector[i].getPosition().y) > 32)
+			{ //if the actor is greater than 32 pixels away from the player (if it isn't, there is no need to move)
+				if( (abs( (double) PLAYER_ONE.getPositionX() - actorVector[i].getPosition().x) > abs( (double) PLAYER_ONE.getPositionY() - actorVector[i].getPosition().y)))
+				{ //if the x is further away than the y then move x. otherwise move in y.
+					if (actorVector[i].getPosition().x < PLAYER_ONE.getPositionX() + 32 )
+						actorVector[i].changeDirection(Right);
+					else if (actorVector[i].getPosition().x > PLAYER_ONE.getPositionX() - 32)
+						actorVector[i].changeDirection(Left);
+				}
+				else
+				{
+					if (actorVector[i].getPosition().y < PLAYER_ONE.getPositionY() + 32)
+						actorVector[i].changeDirection(Up);
+					else if (actorVector[i].getPosition().y > PLAYER_ONE.getPositionY() - 32)
+						actorVector[i].changeDirection(Down);
+				}
+				if(actorVector[i].getIsHittingWall() == true)
+					actorVector[i].incrementDirection();
+			}
+			else actorVector[i].setMoving(false);
+		}
+	}
+ 
+ 
+    /* (-) Drawing the NPCs */
+	glEnd();
 
-	//glBegin(GL_POINTS);
-	//glColor3f(0,1,0);
-	//glVertex2i(nathan.getPositionX(), nathan.getPositionY());
-	//glEnd();
+	//suspicsion meter stuff - Cole
+	susMeter.updatePosistion(PLAYER_ONE.getPositionX(), PLAYER_ONE.getPositionY());
+	susMeter.render();
+
 	scene.render();
-
-	glBindTexture(GL_TEXTURE_2D, scene.textureData.getTexture());
-
-	float textureCoords[] = {0,0, 1,0, 0,1, 0,1, 1,1, 1,0};
-	float playerPos[] = {nathan.getPositionX()-32,nathan.getPositionY()-32,
-		nathan.getPositionX()+32,nathan.getPositionY()-32,
-		nathan.getPositionX()-32,nathan.getPositionY()+32,
-		nathan.getPositionX()-32,nathan.getPositionY()+32,
-		nathan.getPositionX()+32,nathan.getPositionY()+32,
-		nathan.getPositionX()+32,nathan.getPositionY()-32};
-	float playerCol[] = {1,1,0, 1,1,0, 0,1,1, 0,1,1, 1,0,1, 1,0,1};
-
-	//cout << scene.textureData.texture[0] << endl;
-	glVertexPointer(2, GL_FLOAT, 0, playerPos);
-	glColorPointer(3, GL_FLOAT, 0, playerCol);
-	glTexCoordPointer(2, GL_FLOAT, 0, textureCoords);
-	glDrawArrays(GL_TRIANGLES, 0, 6);
 
 	glutPostRedisplay();
 	glutSwapBuffers();
@@ -92,319 +239,126 @@ void display(void)
 void reshape(int x, int y)
 {
 	WIDTH = x, HEIGHT = y;
-	calculateViewPort(nathan);
+	updateViewPort(PLAYER_ONE);
 }
 
 void idle(void)
 {
-	nathan.setSpeed(4);
-	nathan = menuStates(nathan, DAN);
-	//if(1 < cycles)
-	//{
-	//	nathan = menuStates(nathan, DAN);
-	//	cycles = 0;
-	//}
-	//else cycles++;
-	//timer.updateSystem();
-}
-
-///////////MOVE TO CLASS/////////////
-vector<string> getWorldFromTextFile(string fname)
-{
-	vector<string> stringWorld;
-	string line;
-	ifstream infile;
-
-	unsigned int lineNum = 0;
-
-	infile.open(fname);
-
-	while(!infile.eof())
+	if(!pause)
 	{
-		getline(infile,line);
-		if (line=="") continue; //gets ride of blank line
-		stringWorld.push_back(line);
-	}
-	infile.close();
-
-	return stringWorld;
-}
-
-//testing purposes
-void printStringVector(vector<string> vec)
-{
-	for (int i = 0; i<vec.size();i++)
-	{
-		cout<<vec.at(i)<<endl;
+		PLAYER_ONE.setSpeed(2);
+		PLAYER_ONE = menuStates(PLAYER_ONE, DAN);
 	}
 }
 
-bool getPassThroughtByStr(string s)
-{
-	if (s == "false") return false;
-	else if(s == "true") return true;
-	else return false;
-}
+/*
+Populate world reads in unformatted files and populates the current
+game world
 
-bool doubleStar(string line)
-{
-	return line[0]=='*' && line[1]=='*';
-}
+Required Updates:
+-Dynamic file name
+-Text file size should be determined by the
+file and not the function
+-The file reader should be able to handle structured
+file types, specifically in 
+	-XML(This will be used for data transmission of hard coded entities)
+	-DTD(This is the key file that explains to the reader
+	which information belongs to which class and how to handle it)
+	-CONF(This will be used for the dynamic information such as 
+	gamefiles, world files, object files etc.)
+	-PNG(This will be used to store images)
 
-bool tripleStar(string line)
-{
-	return line[0]=='*' && line[1]=='*' && line[2]=='*';
-}
+-If time permits there should be an update added so that 
+files are stored as Byte information and not as plaintext
+as to allow a 4 bit shift to each character to make the file
+unreadable outside of the game program
 
-void parseAbstractionLevels(vector<string> txtVec, world map)
-{
-	string title;
-	int temp;
-	bool search = false;
-	tile tl;
-	actor act;
-	object ob;
-	string line;
-	player ply(map);
+*/
 
-	for (int i = 0; i <txtVec.size();i++)
+void populateWorld(void)
+{
+	vector<vector<int>> worldMap = fr.getWorld();
+	fr.print2dIntVector(worldMap);
+
+	int n = 0;
+	unsigned int mapLocation[2] = {0,0};
+	
+	for(int i = 0; i < worldMap.size(); i++)
 	{
-		line = txtVec.at(i);
-		
-		if(doubleStar(line) && !tripleStar(line))
-		{
-			title = line.substr(2,line.size());
-			cout<<"Title:"<<title<<endl;
+		for(int j = 0; j < worldMap.at(0).size(); j++)
+		{	
+			DAN.setTileLocation(mapLocation, worldMap.at(i).at(j));
+			mapLocation[0]++;
 		}
-		else if (tripleStar(line))
-		{
-			search = !search;
-			if (!search) 
-			{
-				map.addTile(tl);
-				map.addObject(ob);
-				map.addActor(act);
-			}
-			continue;
-		}
-		else
-		{
-			int index = line.find(":") +1;
-			string type = line.substr(1,index-2);
-			cout<<"type:"<<type<<endl;	
-			string subStr = line.substr(index+1,line.size()-1);
-			cout<<"subString:"<<subStr<<endl;
-			unsigned int mapSize[2];
-
-			if(type =="DESCRIPTION")
-			{
-				if (title =="TILE" )
-				{
-					cout<<"------>i am in tile discription"<<endl;
-					tl.changeDescription(subStr);
-				}
-				else if (title == "OBJECT")
-				{
-					ob.changeDescription(subStr);
-				}
-				else if (title =="ACTOR")
-				{
-					act.changeDescription(subStr);
-				}
-				else if (title =="PLAYER")
-				{
-					ply.changeDescription(subStr);
-				}
-			}
-			else if(type =="PASSABLE")
-			{
-				if (title =="TILE" )
-				{	
-					tl.changePassThrough(getPassThroughtByStr(subStr));
-				}
-				else if (title == "OBJECT")
-				{
-					ob.changePassThrough(getPassThroughtByStr(line));
-				}
-			}
-			else if(type == "FACE")
-			{
-				
-				if (title == "OBJECT")
-				{
-					if (subStr == "up") ob.changeFace(object::direction::up);
-					else if (subStr == "down") ob.changeFace(object::direction::down);
-					else if (subStr == "left") ob.changeFace(object::direction::left);
-					else if (subStr == "right") ob.changeFace(object::direction::right);
-					else ob.changeFace(object::direction::up);
-				}
-				else if (title =="ACTOR")
-				{
-					if (subStr == "up") act.changeDirection(actor::direction::up);
-					else if (subStr == "down") act.changeDirection(actor::direction::down);
-					else if (subStr == "left") act.changeDirection(actor::direction::left);
-					else if (subStr == "right") act.changeDirection(actor::direction::right);
-					else act.changeDirection(actor::direction::up);
-				}
-				else if (title =="PLAYER")
-				{
-					if (subStr == "up") ply.changeDirection(player::direction::up);
-					else if (subStr == "down") ply.changeDirection(player::direction::down);
-					else if (subStr == "left") ply.changeDirection(player::direction::left);
-					else if (subStr == "right") ply.changeDirection(player::direction::right);
-					else ply.changeDirection(player::direction::up);
-				}
-			}
-			else if(type =="START_X")
-			{
-				if (title =="ACTOR") act.setPosX(stoi(subStr));
-				else if (title=="PLAYER") ply.setPosX(stoi(subStr)); 
-			}
-			else if(type =="START_Y")
-			{
-				if (title =="ACTOR") act.setPosY(stoi(subStr));
-				else if (title=="PLAYER") ply.setPosY(stoi(subStr)); 
-			}
-			else if(type == "BITMAP")
-			{
-				if (title =="ACTOR") act.changeBitMapName(subStr);
-				else if (title=="PLAYER") ply.changeBitMap(subStr); 
-			}
-			else if(type =="SPEED")
-			{
-				if (title =="ACTOR") act.setSpeed(stoi(subStr));
-				else if (title=="PLAYER") ply.setSpeed(stoi(subStr));
-			}
-			else if(type=="WIDTH")
-			{
-				if (title =="TILE_MAP") mapSize[0] = (unsigned int) stoi(subStr);
-				cout<<"----------->w= "<<mapSize[0]/2<<endl;
-			}
-			else if(type=="HEIGHT")
-			{
-				if (title =="TILE_MAP")
-				{
-					mapSize[1]= (unsigned int) stoi(subStr);
-					map.changeDimension(mapSize);
-				}
-			}else 
-			{
-				tileMapVec.push_back(line);	
-			}
-		}
-	}	
-}
-
-void populateWorld(vector<string> map)
-{
-
-	//change all this
-	unsigned int size[] = {0,map.size()};
-
-	for (int i =0; i<map.size();i++)
-	{
-		for(int j = 0; j<(map.at(i)).length(); j++)
-		{
-			switch((map.at(i))[j])
-			{
-			case '0':
-				DAN.setTileLocation(size, 0);
-				size[0]++;
-				break;
-			case '1':
-				DAN.setTileLocation(size, 1);	
-				size[0]++;
-				break;	
-			}
-		}
-		size[0]= 0;
-		size[1]--;
+		mapLocation[1]++;
+		mapLocation[0] = 0;
 	}
+	
 }
 
+/*
+Obligatory main function
 
-//this is depreciated
-void populateWorld(unsigned int txtFileSize[])
-{
-        string fname = "world.txt";
-        string line;
-        ifstream infile;
-
-        unsigned int lineNum = 0;
-
-        unsigned int size[] = {0,txtFileSize[1]};
-
-        infile.open(fname);
-
-        while(!infile.eof())
-        {
-                getline(infile,line);
-
-                cout<<line<<endl;
-
-                for (size_t i = 0; i < line.size(); i++)
-                {
-                        char n = line[i];
-
-                        //cout<<"char"<<n<<endl;
-
-                        if (n=='0'){
-                                DAN.setTileLocation(size, 0); //ID = 0 -->wall
-                                size[0]++;
-                                //cout<<"i should be in here 0"<<endl;
-                        }
-                        else if(n=='1')
-                        {
-                                DAN.setTileLocation(size, 1);  //ID = 1 --> floor      
-                                size[0]++;
-                                //cout<<"i should be in here 1"<<endl;
-                        }
-                }
-                size[0] = 0;
-                size[1]--;
-        }
-
-infile.close();
-}
-
-/////////END MOVE TO CLASS///////
-
+This requires a lot of clean up
+*/
 void main(int argv, char* argc[])
 {
+		worldMap = fr.getWorld();
+
 		resetKeys();
 
+		/*(+) NPC stuff 
+		*This will initialize all the actors and push them into actorVector
+		*/
+
+		for (int i = 2; i < 5 + 2; i++){
+			actor newActor(5*64,13*64, 4);
+			DAN.addActor(newActor);
+		}
+		actorVector = DAN.getActorSet();
+		//(-) NPC stuff //
+
+		scene.setUpCharacters(7);
         tile block;
         object newBlock;
 
-		vector<string> vec = getWorldFromTextFile("world_NEW.txt");
-		//printStringVector(vec);
-		parseAbstractionLevels(vec, DAN);
-
-
-
-        //unsigned int size[] = {5,5};
+        unsigned int size[] = {5,5};
 
         //size of text file rows,columns
-        //unsigned int txtFileSize[] = {50,50};
+		unsigned int fileSize[] = {fr.getX(),fr.getY()};
 
-        //DAN.changePlayerStart(size);
+        DAN.changePlayerStart(size);
         player greg(DAN);
-        nathan = greg;
+        PLAYER_ONE = greg;
 
-       // block.changeDescription("HOORAY");
-        //block.changePassThrough(true);
+        block.changeDescription("HOORAY");
 
-        //DAN.changeDimension(txtFileSize);
 
-		//DAN.addTile(block);
-        //DAN.printLog();
+        DAN.changeDimension(fileSize);
 
-		populateWorld(tileMapVec);
+		populateWorld();
 
-		cout<<"tile map: "<<endl;
-		printStringVector(tileMapVec);
+		DAN.addTile(block);
+		block.changePassThrough(true);
+		block.changeDescription("NOT HOORAY");
+		DAN.addTile(block);
+		block.changePassThrough(false);
+		DAN.addTile(block);
+		DAN.addTile(block);
+		DAN.addTile(block);
+		DAN.addTile(block);
+		DAN.addTile(block);
+		DAN.addTile(block);
+		DAN.addTile(block);
+		DAN.addTile(block);
+        DAN.printLog();
 
-		scene.worldToArray(DAN, 64);
+		DAN.printLog();
+
+        populateWorld();
+
+		scene.worldToArray(DAN);
+		scene.setUpPlayer("Charactersforreal.png", PLAYER_ONE, DAN);
 
         glutInit(&argv, argc);
         glutInitWindowSize(600,600);
@@ -413,6 +367,7 @@ void main(int argv, char* argc[])
         glutIdleFunc(idle);
         glutReshapeFunc(reshape);
         glutKeyboardFunc(keyboardInput);
+		glutPassiveMotionFunc(passiveMouse);
         glutKeyboardUpFunc(keyRelease);
         glutMainLoop();
 }
